@@ -9,7 +9,8 @@ var indexRouter = require('./routes/index');
 var usersRouter = require('./routes/users');
 
 var app = express();
-const db = require('./config/db')
+const db = require('./config/db');
+
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
@@ -25,8 +26,9 @@ app.use('/users', usersRouter);
 
 app.get('/fibbauru', (req, res) => {
 res.sendFile(path.join(__dirname, 'public', 'index.html'));
-})
-app.get('/cadastro', async (req, res) => {
+});
+
+app.get('/tabela-alunos', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM aluno');
     res.render('aluno', { alunos: rows});
@@ -35,11 +37,12 @@ app.get('/cadastro', async (req, res) => {
     res.status(500).send('Erro interno no servidor.');
   }
 });
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   next(createError(404));
 });
-//teste
+
 // error handler
 app.use(function(err, req, res, next) {
   // set locals, only providing error in development
