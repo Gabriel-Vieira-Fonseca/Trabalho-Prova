@@ -24,8 +24,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
-app.get('/fibbauru', (req, res) => {
-res.sendFile(path.join(__dirname, 'public', 'index.html'));
+app.get('/fibbauru', async (req, res) => {
+    try {
+        const sql = `
+            SELECT
+                a.id_aluno,
+                a.matricula,
+                a.nome AS nome_aluno,
+                a.cpf,
+                a.celular,
+                a.id_curso,
+                c.nome_curso
+            FROM aluno a
+            INNER JOIN curso c ON a.id_curso = c.id_curso
+            ORDER BY a.nome
+        `;
+
+        const [alunos] = await db.query(sql);
+
+        res.render('alunos', { alunos });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Erro ao carregar alunos.');
+    }
 });
 
 app.get('/api/alunos', async (req, res) => {
