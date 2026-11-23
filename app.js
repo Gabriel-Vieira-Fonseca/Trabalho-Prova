@@ -1,4 +1,3 @@
-
 var createError = require('http-errors');
 var express = require('express');
 var path = require('path');
@@ -24,51 +23,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
-app.get('/fibbauru', async (req, res) => {
-    try {
-        const sql = `
-            SELECT
-                a.id_aluno,
-                a.matricula,
-                a.nome AS nome_aluno,
-                a.cpf,
-                a.celular,
-                a.id_curso,
-                c.nome_curso
-            FROM aluno a
-            INNER JOIN curso c ON a.id_curso = c.id_curso
-            ORDER BY a.nome
-        `;
-
-        const [alunos] = await db.query(sql);
-
-        res.render('alunos', { alunos });
-
-    } catch (err) {
-        console.error(err);
-        res.status(500).send('Erro ao carregar alunos.');
-    }
-});
-
-app.get('/api/alunos', async (req, res) => {
+app.get('/api/cadastros', async (req, res) => {
     try {
         let sql = `
             SELECT
-                a.id_aluno,
-                a.matricula,
-                a.nome AS nome_aluno,
-                a.cpf,
-                a.celular,
-                a.id_curso,
-                c.nome_curso
-            FROM aluno a, curso c
-            WHERE a.id_curso = c.id_curso
+                j.id_jogador,
+                j.nome AS nome_jogador,
+                j.posicao,
+                j.preco,
+                j.id_nacional ,
+                j.id_clube,
+                n.nacionalidade,
+                c.nome_clube
+            FROM jogador j, nacional n, clube c
+            WHERE  j.id_nacional = n.id_nacional AND j.id_clube = c.id_clube
         `;
 
         const parametros = [];
 
         if (req.query.pesquisa) {
-            sql += ` AND (a.nome LIKE ? OR a.matricula LIKE ?)`;
+            sql += ` AND (j.nome LIKE ? OR j.posicao LIKE ?)`;
 
             parametros.push(
                 '%' + req.query.pesquisa + '%',
@@ -76,7 +50,7 @@ app.get('/api/alunos', async (req, res) => {
             );
         }
 
-        sql += ' ORDER BY a.nome';
+        sql += ' ORDER BY j.preco';
 
         const [rows] = await db.query(sql, parametros);
 
@@ -86,10 +60,113 @@ app.get('/api/alunos', async (req, res) => {
         console.error(err);
 
         res.status(500).json({
-            erro: 'Erro ao buscar alunos: ' + err.message
+            erro: 'Erro ao buscar registro: ' + err.message
         });
     }
 });
+
+app.post('/api/cadastros', async (req, res) => {
+    try {
+        const { nome, localizacao, ecos, id_fraqueza, id_status } = req.body;
+
+        const sql = `
+            INSERT INTO jogador
+            (nome,posicao,preco,id_nacional,id_clube)
+            VALUES (?, ?, ?, ?, ?)
+        `;
+
+        const [resultado] = await db.query(sql, [
+            nome,
+            posicao,
+            preco,
+            id_nacional,
+            id_clube
+        ]);
+
+        res.status(201).json({
+            mensagem: 'Registrado com sucesso, ' + nome + '.',
+            id_criatura: resultado.insertId
+        });
+
+    } catch (erro) {
+        console.error('Erro ao registrar jogador:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao registrar jogador.'
+        });
+    }
+});
+
+app.put('/api/cadastros/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        const { nome, posicao, preco, id_nacional, id_clube } = req.body;
+
+        if (!nome || !posicao || preco == null || preco === '' || !id_nacional || !id_clube) {
+            return res.status(400).json({
+                erro: 'Preencha todos os campos.'
+            });
+        }
+
+        const [resultado] = await db.query(
+            `UPDATE jogador
+             SET nome = ?,
+                 posicao = ?,
+                 preco = ?,
+                 id_nacional = ?,
+                 id_clube = ?
+             WHERE id_criatura = ?`,
+            [nome, posicao, preco, id_nacional, id_clube, id]
+        );
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Registro não encontrado.'
+            });
+        }
+
+        res.json({
+            mensagem: 'Registro atualizado com sucesso, ' + nome + '.'
+        });
+
+    } catch (erro) {
+        console.error('Erro ao atualizar registro:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao atualizar registro.'
+        });
+    }
+});
+
+app.delete('/api/cadastros/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+
+        const [resultado] = await db.query(
+            'DELETE FROM jogador WHERE id_jogador = ?',
+            [id]
+        );
+
+        if (resultado.affectedRows === 0) {
+            return res.status(404).json({
+                erro: 'Registro não encontrado.'
+            });
+        }
+
+        res.json({
+            mensagem: 'Registro deletado com sucesso, ' + nome + '.'
+        });
+
+    } catch (erro) {
+        console.error('Erro ao deletar registro:', erro);
+
+        res.status(500).json({
+            erro: 'Erro ao deletar registro.'
+        });
+    }
+});
+
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   next(createError(404));
