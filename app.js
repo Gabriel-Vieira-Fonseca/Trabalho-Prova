@@ -28,16 +28,20 @@ app.get('/api/cadastros', async (req, res) => {
         let sql = `
             SELECT
                 j.id_jogador,
-                j.nome AS nome_jogador,
-                j.posicao,
-                j.preco,
-                j.id_nacional ,
-                j.id_clube,
-                n.nacionalidade,
-                c.nome_clube
-            FROM jogador j, nacional n, clube c
-            WHERE  j.id_nacional = n.id_nacional AND j.id_clube = c.id_clube
+            j.nome,
+            j.posicao,
+            j.preco,
+            j.foto,
+            n.nacionalidade,
+            c.nome_clube
+            FROM jogador j
+            INNER JOIN nacional n
+             ON j.id_nacional = n.id_nacional
+            INNER JOIN clube c
+            ON j.id_clube = c.id_clube
+        WHERE 1=1
         `;
+        
 
         const parametros = [];
 
@@ -67,7 +71,7 @@ app.get('/api/cadastros', async (req, res) => {
 
 app.post('/api/cadastros', async (req, res) => {
     try {
-        const { nome, localizacao, ecos, id_fraqueza, id_status } = req.body;
+        const { nome, posicao, preco, id_nacional, id_clube } = req.body;
 
         const sql = `
             INSERT INTO jogador
@@ -85,7 +89,7 @@ app.post('/api/cadastros', async (req, res) => {
 
         res.status(201).json({
             mensagem: 'Registrado com sucesso, ' + nome + '.',
-            id_criatura: resultado.insertId
+            id_jogador: resultado.insertId
         });
 
     } catch (erro) {
@@ -116,7 +120,7 @@ app.put('/api/cadastros/:id', async (req, res) => {
                  preco = ?,
                  id_nacional = ?,
                  id_clube = ?
-             WHERE id_criatura = ?`,
+             WHERE id_jogador = ?`,
             [nome, posicao, preco, id_nacional, id_clube, id]
         );
 
@@ -155,7 +159,7 @@ app.delete('/api/cadastros/:id', async (req, res) => {
         }
 
         res.json({
-            mensagem: 'Registro deletado com sucesso, ' + nome + '.'
+            mensagem: 'Registro deletado com sucesso (ID: ' + id + ').'
         });
 
     } catch (erro) {
