@@ -1,79 +1,74 @@
-var express = require('express');
-var router = express.Router();
-var express = require('express');
-var router = express.Router();
-const db = require('../config/db');
-/* GET home page. */
-router.get(['/', '/itens', '/fibbauru'], async (req, res, next) => {
-    try {
-        const pesquisa = req.query.pesquisa || '';
+const express = require('express');
+const router = express.Router();
+const pool = require('../config/db');
+const multer = require('multer');
+const path = require('path');
 
-        let sql = `
-            SELECT
-               j.id_jogador,
-                j.nome ,
-                j.posicao,
-                j.preco,
-                j.id_nacional ,
-                j.id_clube,
-                j.foto,
-                n.nacionalidade,
-                c.nome_clube
-            FROM jogador j, nacional n, clube c
-            WHERE  j.id_nacional = n.id_nacional AND j.id_clube = c.id_clube
-        `;
-
-        const parametros = [];
-
-        if (pesquisa) {
-            sql += ` AND (j.nome LIKE ? OR j.posicao LIKE ?)`;
-
-            parametros.push(
-                '%' + pesquisa + '%',
-                '%' + pesquisa + '%'
-            );
-        }
-
-        sql += ' ORDER BY j.preco';
-
-        const [registros] = await db.query(sql, parametros);
-
-        res.render('index', {
-        registros,
-        jogadores: registros,
-         pesquisa,
-        cadastrado: req.query.cadastrado === '1'
-        });
-
-    } catch (erro) {
-        next(erro);
-    }
+const storage = multer.diskStorage({
+  destination: 'public/images/',
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname));
+  }
 });
 
-router.post('/itens', async (req, res, next) => {
-    try {
-        const { nome, posicao, preco, id_nacional, id_clube,foto } = req.body;
+const upload = multer({ storage });
 
-        const sql = `
-            INSERT INTO jogador
-            (nome, posicao, preco, id_nacional, id_clube,foto)
-            VALUES (?, ?, ?, ?, ?, ?)
-        `;
+router.get('/', async (req, res, next) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const like = `%${q}%`;
+    const [jogadores] = q
+      ? await pool.query(`SELECT * FROM jogadores WHERE nome LIKE ? OR posicao LIKE ?
+                          OR nacionalidade LIKE ? OR clube LIKE ? ORDER BY id`, [like, like, like, like])
+      : await pool.query('SELECT * FROM jogadores ORDER BY id');
+    const [todos] = await pool.query('SELECT * FROM jogadores ORDER BY nome');
+    res.render('index', { jogadores, todos, q });
+  } catch (e) { next(e); }
+});
 
-        await db.query(sql, [
-            nome,
-            posicao,
-            preco,
-            id_nacional,
-            id_clube,
-            foto
-        ]);
+router.post('/jogadores', upload.single('foto'), async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    await pool.query(
+      'INSERT INTO jogadores (foto,nome,posicao,preco,nacionalidade,clube) VALUES (?,?,?,?,?,?)',
+      [
+        req.file ? `/images/${req.file.filename}` : null,
+        (b.nome || '').trim(),
+        b.posicao,
+        Number(b.preco) || 0,
+        (b.nacionalidade || '').trim() || null,
+        (b.clube || '').trim() || null
+      ]
+    );
+    res.redirect('/');
+  } catch (e) { next(e); }
+});
 
-        res.redirect(303, '/?cadastrado=1');
+router.post('/jogadores/:id/editar', upload.single('foto'), async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const fotoFinal = req.file ? `/images/${req.file.filename}` : (b.fotoAtual || null);
+    await pool.query(
+      'UPDATE jogadores SET foto=?,nome=?,posicao=?,preco=?,nacionalidade=?,clube=? WHERE id=?',
+      [
+        fotoFinal,
+        (b.nome || '').trim(),
+        b.posicao,
+        Number(b.preco) || 0,
+        (b.nacionalidade || '').trim() || null,
+        (b.clube || '').trim() || null,
+        req.params.id
+      ]
+    );
+    res.redirect('/');
+  } catch (e) { next(e); }
+});
 
-    } catch (erro) {
-        next(erro);
-    }
+router.post('/jogadores/:id/deletar', async (req, res, next) => {
+  try {
+    await pool.query('DELETE FROM jogadores WHERE id=?', [req.params.id]);
+    res.redirect('/');
+  } catch (e) { next(e); }
 });
 
 module.exports = router;
